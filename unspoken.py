@@ -29,6 +29,9 @@ COLOR_BUTTON_HOVER = (70, 95, 140)
 COLOR_BUTTON_DISABLED = (45, 45, 52)
 COLOR_ACCENT = (180, 160, 120)
 
+# Start screen (not a narrative scene; `current_scene_id == "start"` before play)
+START_BUTTON_RECT = pygame.Rect(300, 310, 200, 48)
+
 # --- Game stats (starting values per design) ---------------------------------
 family_honor = 50
 religious_conformity = 50
@@ -287,12 +290,15 @@ def main() -> None:
     clock = pygame.time.Clock()
 
     font_title = pygame.font.SysFont("arial", 22, bold=True)
+    font_display = pygame.font.SysFont("arial", 44, bold=True)
+    font_subtitle = pygame.font.SysFont("arial", 20)
     font_body = pygame.font.SysFont("arial", 18)
     font_small = pygame.font.SysFont("arial", 15)
     font_button = pygame.font.SysFont("arial", 16)
 
     scenes = build_scenes()
-    current_scene_id = "naming"
+    # Begin on the start screen; "start" is not in `scenes`.
+    current_scene_id = "start"
     ending_key: str | None = None
 
     # Button layout
@@ -313,6 +319,10 @@ def main() -> None:
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if current_scene_id == "start":
+                    if START_BUTTON_RECT.collidepoint(event.pos):
+                        current_scene_id = "naming"
+                    continue
                 scene = scenes[current_scene_id]
                 if current_scene_id == "ending":
                     restart_rect = pygame.Rect(button_left, restart_y, 200, button_height)
@@ -321,7 +331,7 @@ def main() -> None:
                         religious_conformity = 50
                         state_suspicion = 0
                         ending_key = None
-                        current_scene_id = "naming"
+                        current_scene_id = "start"
                         scenes = build_scenes()
                     continue
                 for i, choice in enumerate(scene.choices):
@@ -349,24 +359,54 @@ def main() -> None:
         # --- Draw ---
         screen.fill(COLOR_BG)
 
-        scene = scenes[current_scene_id]
-        y_stats = 16
-        draw_hud(screen, font_small, y_stats)
+        if current_scene_id == "start":
+            title_big = font_display.render(TITLE, True, COLOR_ACCENT)
+            screen.blit(title_big, title_big.get_rect(center=(WINDOW_WIDTH // 2, 160)))
+            sub = font_subtitle.render(
+                "A choice-based story about identity under pressure",
+                True,
+                COLOR_MUTED,
+            )
+            screen.blit(sub, sub.get_rect(center=(WINDOW_WIDTH // 2, 220)))
+            blurb = (
+                "You play as Omar. There is no single win—only paths shaped by "
+                "family, faith, and the state. Click Start when you are ready."
+            )
+            for i, line in enumerate(wrap_text(font_body, blurb, 640)):
+                row = font_body.render(line, True, COLOR_TEXT)
+                screen.blit(row, row.get_rect(center=(WINDOW_WIDTH // 2, 258 + i * 22)))
 
-        title_surf = font_title.render(scene.title, True, COLOR_ACCENT)
-        screen.blit(title_surf, (40, 44))
+            sh = START_BUTTON_RECT.collidepoint(mouse)
+            pygame.draw.rect(
+                screen,
+                COLOR_BUTTON_HOVER if sh else COLOR_BUTTON,
+                START_BUTTON_RECT,
+            )
+            pygame.draw.rect(screen, COLOR_BORDER, START_BUTTON_RECT, 1)
+            st = font_button.render("Start", True, COLOR_TEXT)
+            screen.blit(st, st.get_rect(center=START_BUTTON_RECT.center))
 
-        pygame.draw.rect(screen, COLOR_STORY_BG, STORY_RECT)
-        pygame.draw.rect(screen, COLOR_BORDER, STORY_RECT, 1)
+            esc_hint = font_small.render("Esc — quit", True, COLOR_MUTED)
+            screen.blit(esc_hint, (40, WINDOW_HEIGHT - 32))
+        else:
+            scene = scenes[current_scene_id]
+            y_stats = 16
+            draw_hud(screen, font_small, y_stats)
 
-        body_lines = wrap_text(font_body, scene.body, STORY_RECT.width - 24)
-        text_y = STORY_RECT.y + 12
-        for line in body_lines:
-            surf = font_body.render(line, True, COLOR_TEXT)
-            screen.blit(surf, (STORY_RECT.x + 12, text_y))
-            text_y += font_body.get_linesize() + 2
+            title_surf = font_title.render(scene.title, True, COLOR_ACCENT)
+            screen.blit(title_surf, (40, 44))
 
-        if current_scene_id != "ending":
+            pygame.draw.rect(screen, COLOR_STORY_BG, STORY_RECT)
+            pygame.draw.rect(screen, COLOR_BORDER, STORY_RECT, 1)
+
+            body_lines = wrap_text(font_body, scene.body, STORY_RECT.width - 24)
+            text_y = STORY_RECT.y + 12
+            for line in body_lines:
+                surf = font_body.render(line, True, COLOR_TEXT)
+                screen.blit(surf, (STORY_RECT.x + 12, text_y))
+                text_y += font_body.get_linesize() + 2
+
+        if current_scene_id not in ("start", "ending"):
             hint = font_small.render(
                 "Click a choice. Gray options are locked by your earlier path.",
                 True,
@@ -398,7 +438,7 @@ def main() -> None:
                 txt = font_button.render(label, True, text_color)
                 text_rect = txt.get_rect(center=rect.center)
                 screen.blit(txt, text_rect)
-        else:
+        elif current_scene_id == "ending":
             restart_rect = pygame.Rect(button_left, restart_y, 200, button_height)
             rh = restart_rect.collidepoint(mouse)
             pygame.draw.rect(
