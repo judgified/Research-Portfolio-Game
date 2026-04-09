@@ -13,10 +13,29 @@ from typing import Callable
 import pygame
 
 # --- Display -----------------------------------------------------------------
-WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 600
+# Logical design size (all layout below is defined relative to this, then scaled).
+BASE_W = 800
+BASE_H = 600
+
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 720
+
+
+def sx(x: int) -> int:
+    """Scale an x-distance or width from the 800px-wide design."""
+    return int(round(x * WINDOW_WIDTH / BASE_W))
+
+
+def sy(y: int) -> int:
+    """Scale a y-distance or height from the 600px-tall design."""
+    return int(round(y * WINDOW_HEIGHT / BASE_H))
+
+
+# Uniform scale for fonts and stroke widths (keeps text readable on larger windows).
+UI_SCALE = min(WINDOW_WIDTH / BASE_W, WINDOW_HEIGHT / BASE_H)
+
 # Story panel sits below the title so text is not covered by the HUD.
-STORY_RECT = pygame.Rect(40, 72, 720, 320)
+STORY_RECT = pygame.Rect(sx(40), sy(72), sx(720), sy(320))
 TITLE = "Unspoken"
 
 # Colors (RGB) — dark olive slate / white / green / red / beige
@@ -24,6 +43,16 @@ COLOR_BG = (18, 22, 16)
 COLOR_STORY_BG = (22, 30, 22)
 COLOR_BORDER = (130, 38, 42)
 COLOR_TEXT = (255, 255, 255)
+# Story panel: loose-leaf paper look (warm off-white, subtle grain, ruled lines)
+COLOR_PAGE_PAPER_TOP = (255, 252, 246)
+COLOR_PAGE_PAPER_BOT = (248, 244, 234)
+COLOR_PAGE_BORDER = (205, 195, 178)
+COLOR_PAGE_SHADOW_OUTER = (28, 30, 24)
+COLOR_PAGE_SHADOW_INNER = (14, 16, 12)
+COLOR_PAGE_MARGIN_LINE = (190, 130, 130)
+COLOR_PAGE_RULE = (236, 230, 218)
+COLOR_PAGE_INNER_LINE = (238, 232, 220)
+COLOR_PAGE_INK = (32, 28, 24)
 COLOR_MUTED = (196, 186, 168)
 COLOR_BUTTON = (28, 112, 58)
 COLOR_BUTTON_HOVER = (46, 158, 82)
@@ -33,9 +62,9 @@ COLOR_TITLE_SHADOW = (28, 10, 12)
 COLOR_TITLE_OUTLINE = (150, 44, 48)
 
 # Start screen (not a narrative scene; `current_scene_id == "start"` before play)
-START_BUTTON_RECT = pygame.Rect(230, 348, 340, 72)
-BUTTON_CORNER_RADIUS = 14
-CHOICE_NUMBER_STRIP_W = 44
+START_BUTTON_RECT = pygame.Rect(sx(230), sy(348), sx(340), sy(72))
+BUTTON_CORNER_RADIUS = max(8, sy(14))
+CHOICE_NUMBER_STRIP_W = max(36, sx(44))
 
 # --- Game stats (starting values per design) ---------------------------------
 family_honor = 50
@@ -286,6 +315,77 @@ def draw_vertical_gradient(
         pygame.draw.line(surface, (r, g, b), (0, y), (width, y))
 
 
+def draw_paper_fill(
+    surface: pygame.Surface,
+    rect: pygame.Rect,
+    top_color: tuple[int, int, int],
+    bottom_color: tuple[int, int, int],
+) -> None:
+    """Fill rectangle with a soft vertical wash plus subtle horizontal grain (paper fiber)."""
+    h = max(1, rect.height - 1)
+    for y in range(rect.top, rect.bottom):
+        t = (y - rect.top) / h
+        r = int(top_color[0] + (bottom_color[0] - top_color[0]) * t)
+        g = int(top_color[1] + (bottom_color[1] - top_color[1]) * t)
+        b = int(top_color[2] + (bottom_color[2] - top_color[2]) * t)
+        # Light banding + noise-like variation (stable, cheap “fibers”)
+        grain = int(2.2 * math.sin(y * 0.13)) + ((y >> 3) & 1) * 2 - 1
+        r = max(0, min(255, r + grain))
+        g = max(0, min(255, g + grain))
+        b = max(0, min(255, b + grain))
+        pygame.draw.line(surface, (r, g, b), (rect.left, y), (rect.right, y))
+
+
+def draw_book_page(surface: pygame.Surface, rect: pygame.Rect) -> None:
+    """Draw the story area as a sheet of paper (shadow, grain, faint rules, margin)."""
+    rad = max(0, sy(3))
+
+    off_big = max(3, sy(6))
+    shadow_outer = rect.copy()
+    shadow_outer.x += off_big
+    shadow_outer.y += off_big
+    pygame.draw.rect(surface, COLOR_PAGE_SHADOW_OUTER, shadow_outer, border_radius=rad + 1)
+
+    off_sm = max(2, sy(3))
+    shadow_inner = rect.copy()
+    shadow_inner.x += off_sm
+    shadow_inner.y += off_sm
+    pygame.draw.rect(surface, COLOR_PAGE_SHADOW_INNER, shadow_inner, border_radius=rad)
+
+    paper = rect.copy()
+    draw_paper_fill(surface, paper, COLOR_PAGE_PAPER_TOP, COLOR_PAGE_PAPER_BOT)
+
+    # Faint horizontal rules (notebook paper), from past the margin to the right edge
+    mx = paper.left + sx(24)
+    rule_left = mx + sx(8)
+    rule_right = paper.right - sx(14)
+    rule_top = paper.top + sy(18)
+    rule_bot = paper.bottom - sy(14)
+    step = max(20, sy(24))
+    ry = rule_top
+    while ry <= rule_bot:
+        pygame.draw.line(surface, COLOR_PAGE_RULE, (rule_left, ry), (rule_right, ry), 1)
+        ry += step
+
+    bw = max(1, int(round(UI_SCALE)))
+    pygame.draw.rect(surface, COLOR_PAGE_BORDER, paper, width=bw, border_radius=rad)
+
+    inset = sx(8)
+    inner = paper.inflate(-2 * inset, -2 * sy(8))
+    if inner.width > 4 and inner.height > 4:
+        pygame.draw.rect(surface, COLOR_PAGE_INNER_LINE, inner, width=1, border_radius=max(0, rad - 1))
+
+    my_top = paper.top + sy(10)
+    my_bot = paper.bottom - sy(10)
+    pygame.draw.line(
+        surface,
+        COLOR_PAGE_MARGIN_LINE,
+        (mx, my_top),
+        (mx, my_bot),
+        max(1, int(round(UI_SCALE))),
+    )
+
+
 def blit_tracked_text(
     surface: pygame.Surface,
     font: pygame.font.Font,
@@ -404,7 +504,7 @@ def draw_hud(
         f"State suspicion: {state_suspicion}"
     )
     surf = font_small.render(hud, True, COLOR_MUTED)
-    surface.blit(surf, (40, y_stats))
+    surface.blit(surf, (sx(40), y_stats))
 
 
 def main() -> None:
@@ -415,26 +515,32 @@ def main() -> None:
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     clock = pygame.time.Clock()
 
-    font_title = pygame.font.SysFont("arial", 22, bold=True)
-    font_subtitle = pygame.font.SysFont("arial", 21)
-    font_body = pygame.font.SysFont("arial", 18)
-    font_small = pygame.font.SysFont("arial", 15)
-    font_button = pygame.font.SysFont("arial", 17)
-    font_cta = pygame.font.SysFont("arial", 24, bold=True)
-    font_cta_hint = pygame.font.SysFont("arial", 14)
+    fs = UI_SCALE
+    font_title = pygame.font.SysFont("arial", max(16, int(round(22 * fs))), bold=True)
+    font_subtitle = pygame.font.SysFont("arial", max(16, int(round(21 * fs))))
+    font_body = pygame.font.SysFont("arial", max(14, int(round(18 * fs))))
+    font_small = pygame.font.SysFont("arial", max(12, int(round(15 * fs))))
+    font_button = pygame.font.SysFont("arial", max(13, int(round(17 * fs))))
+    font_cta = pygame.font.SysFont("arial", max(18, int(round(24 * fs))), bold=True)
+    font_cta_hint = pygame.font.SysFont("arial", max(11, int(round(14 * fs))))
+    # Serif body text on the book page (falls back if the font is missing).
+    font_book = pygame.font.SysFont(
+        "georgia",
+        max(16, int(round(22 * fs))),
+    )
 
     scenes = build_scenes()
     # Begin on the start screen; "start" is not in `scenes`.
     current_scene_id = "start"
     ending_key: str | None = None
 
-    # Button layout
-    button_width = 700
-    button_height = 54
-    button_left = 50
-    button_start_y = 424
-    button_gap = 60
-    restart_y = 508
+    # Button layout (scaled from BASE_W x BASE_H)
+    button_width = sx(700)
+    button_height = sy(54)
+    button_left = sx(50)
+    button_start_y = sy(424)
+    button_gap = sy(60)
+    restart_y = sy(508)
 
     running = True
     while running:
@@ -540,10 +646,13 @@ def main() -> None:
 
         if current_scene_id == "start":
             cx = WINDOW_WIDTH // 2
-            hero_y = 108
-            track = 10
+            hero_y = sy(108)
+            track = max(6, int(round(10 * UI_SCALE)))
             pulse_scale = 1.0 + 0.03 * math.sin(now * 0.0048)
-            title_font_size = max(74, int(90 * pulse_scale))
+            title_font_size = max(
+                sy(74),
+                int(90 * UI_SCALE * pulse_scale),
+            )
             font_start_pulse = pygame.font.SysFont("arial", title_font_size, bold=True)
             for dx, dy in ((5, 5), (3, 3), (1, 1)):
                 blit_tracked_text(
@@ -564,28 +673,30 @@ def main() -> None:
                 hero_y,
                 tracking=track,
             )
-            underline_y = title_bounds.bottom + 24
+            underline_y = title_bounds.bottom + sy(24)
             pygame.draw.line(
                 screen,
                 COLOR_TITLE_OUTLINE,
                 (title_bounds.left, underline_y),
                 (title_bounds.right, underline_y),
-                3,
+                max(2, int(round(3 * UI_SCALE))),
             )
             sub = font_subtitle.render(
                 "A choice based story about identity under pressure",
                 True,
                 COLOR_MUTED,
             )
-            screen.blit(sub, sub.get_rect(center=(cx, underline_y + 28)))
+            screen.blit(sub, sub.get_rect(center=(cx, underline_y + sy(28))))
             blurb = (
                 "You play as Omar. There is no winning, only paths shaped by "
                 "family, faith, and the state. When you are ready, begin below."
             )
-            blurb_y = underline_y + 54
-            for i, line in enumerate(wrap_text(font_body, blurb, 640)):
+            blurb_y = underline_y + sy(54)
+            blurb_wrap = sx(640)
+            line_step = max(18, int(round(22 * UI_SCALE)))
+            for i, line in enumerate(wrap_text(font_body, blurb, blurb_wrap)):
                 row = font_body.render(line, True, COLOR_TEXT)
-                screen.blit(row, row.get_rect(center=(cx, blurb_y + i * 22)))
+                screen.blit(row, row.get_rect(center=(cx, blurb_y + i * line_step)))
 
             sh = START_BUTTON_RECT.collidepoint(mouse)
             draw_primary_button(
@@ -599,31 +710,36 @@ def main() -> None:
             )
 
             esc_hint = font_small.render("Esc - quit", True, COLOR_MUTED)
-            screen.blit(esc_hint, (40, WINDOW_HEIGHT - 32))
+            screen.blit(esc_hint, (sx(40), WINDOW_HEIGHT - sy(32)))
             alpha = 130 + int(90 * (0.5 + 0.5 * math.sin(now * 0.0065)))
             enter_prompt = font_small.render("Press Enter to begin", True, COLOR_ACCENT)
             enter_prompt.set_alpha(alpha)
             screen.blit(
                 enter_prompt,
-                enter_prompt.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 30)),
+                enter_prompt.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - sy(30))),
             )
         else:
             scene = scenes[current_scene_id]
-            y_stats = 16
+            y_stats = sy(16)
             draw_hud(screen, font_small, y_stats)
 
             title_surf = font_title.render(scene.title, True, COLOR_ACCENT)
-            screen.blit(title_surf, (40, 44))
+            screen.blit(title_surf, (sx(40), sy(44)))
 
-            pygame.draw.rect(screen, COLOR_STORY_BG, STORY_RECT)
-            pygame.draw.rect(screen, COLOR_BORDER, STORY_RECT, 1)
+            draw_book_page(screen, STORY_RECT)
 
-            body_lines = wrap_text(font_body, scene.body, STORY_RECT.width - 24)
-            text_y = STORY_RECT.y + 12
+            # Wider left inset so text clears the red margin line (notebook / book gutter).
+            pad_left = sx(40)
+            pad_right = sx(20)
+            pad_y = sy(16)
+            text_w = STORY_RECT.width - pad_left - pad_right
+            body_lines = wrap_text(font_book, scene.body, text_w)
+            text_y = STORY_RECT.y + pad_y
+            line_skip = font_book.get_linesize() + max(1, sy(3))
             for line in body_lines:
-                surf = font_body.render(line, True, COLOR_TEXT)
-                screen.blit(surf, (STORY_RECT.x + 12, text_y))
-                text_y += font_body.get_linesize() + 2
+                surf = font_book.render(line, True, COLOR_PAGE_INK)
+                screen.blit(surf, (STORY_RECT.x + pad_left, text_y))
+                text_y += line_skip
 
         if current_scene_id not in ("start", "ending"):
             hint = font_small.render(
@@ -631,7 +747,7 @@ def main() -> None:
                 True,
                 COLOR_MUTED,
             )
-            screen.blit(hint, (40, STORY_RECT.bottom + 10))
+            screen.blit(hint, (sx(40), STORY_RECT.bottom + sy(10)))
 
             for i, choice in enumerate(scene.choices):
                 rect = pygame.Rect(
