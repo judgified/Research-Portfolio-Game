@@ -176,10 +176,10 @@ def build_scenes() -> dict[str, Scene]:
             id="naming",
             title="I — Naming",
             body=(
-                "Morning light finds Omar at a plastic table in a municipal hall. "
-                "Forms ask for a name the state can file, a name his family can "
-                "repeat without flinching. The clerk taps a pen. Somewhere between "
-                "language and law, identity becomes paperwork."
+                "Omar is at a government office to renew his ID documents. The clerk "
+                "points to the form and says his name must match the approved spelling. "
+                "His family wants one version, the state wants another, and he has to "
+                "decide what to write before they process his papers."
             ),
             choices=[
                 Choice(
@@ -200,10 +200,10 @@ def build_scenes() -> dict[str, Scene]:
             id="family",
             title="II — Family",
             body=(
-                "Home smells like rice and worry. His uncle speaks of reputation as "
-                "if it were oxygen. His mother listens more than she speaks. Omar "
-                "understands: some rooms are not debates; they are tests you are "
-                "not supposed to fail out loud."
+                "At dinner, Omar's uncle warns that neighbors are watching and gossip "
+                "spreads quickly. His mother asks him to avoid trouble and keep the family "
+                "safe. Omar knows this conversation is really about whether he will hide "
+                "who he is or risk conflict at home."
             ),
             choices=[
                 Choice(
@@ -224,10 +224,10 @@ def build_scenes() -> dict[str, Scene]:
             id="authority",
             title="III — Authority",
             body=(
-                "The street divides: a checkpoint, a sermon, a rumor traveling faster "
-                "than truth. Faith and law overlap here like two shadows from one "
-                "body. A uniform asks for papers. A voice asks for sincerity. Omar "
-                "feels the weight of being readable."
+                "On his way home, Omar is stopped at a checkpoint after a local sermon "
+                "about \"moral threats.\" An officer checks his documents and asks personal "
+                "questions that are meant to test his obedience. One wrong answer could "
+                "bring attention from both religious leaders and the police."
             ),
             choices=[
                 Choice(
@@ -250,9 +250,10 @@ def build_scenes() -> dict[str, Scene]:
             id="violence",
             title="IV — Violence",
             body=(
-                "A neighbor's door splinters. A crowd forms before anyone agrees on "
-                "what it saw. Phones rise like small torches. Omar's pulse insists: "
-                "move, speak, hide—choose before the moment hardens into history."
+                "Late at night, security forces raid a nearby apartment. A frightened "
+                "teen is pulled into the hallway while neighbors gather and record. Omar "
+                "is close enough to help, document what happens, or leave before anyone "
+                "links him to the scene."
             ),
             choices=[
                 Choice(
@@ -526,7 +527,7 @@ def main() -> None:
     # Serif body text on the book page (falls back if the font is missing).
     font_book = pygame.font.SysFont(
         "georgia",
-        max(16, int(round(22 * fs))),
+        max(17, int(round(24 * fs))),
     )
 
     scenes = build_scenes()
@@ -688,11 +689,13 @@ def main() -> None:
             )
             screen.blit(sub, sub.get_rect(center=(cx, underline_y + sy(28))))
             blurb = (
-                "You play as Omar. There is no winning, only paths shaped by "
-                "family, faith, and the state. When you are ready, begin below."
+                "You play as Omar. He is nineteen, gay, and lives in the Middle East "
+                "in a fictional Islamic state—where family expectations, religious norms, "
+                "and the law can all weigh on the same person. There is no winning, only "
+                "paths shaped by family, faith, and the state. When you are ready, begin below."
             )
             blurb_y = underline_y + sy(54)
-            blurb_wrap = sx(640)
+            blurb_wrap = min(sx(720), WINDOW_WIDTH - sx(80))
             line_step = max(18, int(round(22 * UI_SCALE)))
             for i, line in enumerate(wrap_text(font_body, blurb, blurb_wrap)):
                 row = font_body.render(line, True, COLOR_TEXT)
